@@ -27,5 +27,17 @@
 
 ## 项目支持
 对于游廊工程开发的问题可以去[discussions](https://github.com/takegine/gallery-editor/discussions)进行讨论
+
 对于本编辑器的错误可以直接提[issue](https://github.com/takegine/gallery-editor/issues)
 
+对于kv的键值疑义的可以在[FireFrog的整理表格](https://docs.qq.com/sheet/DZUVFaVVobmptQ2Rl)中提出修改意见
+
+## 更新记录
+#### v0.0.4 2025-04-24
+使用火蛙的KV收集数据
+使用moddota的常量数据
+增加原键值显示
+增加自定义键值修改，自动读取AbilitySpecial和AbilityValues，保存为AbilityValues
+增加捐赠页面
+增加对项目名的本地话记录
+增加游玩历史的显示
