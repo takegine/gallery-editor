@@ -1,0 +1,3 @@
+[submodule "app"]
+	path = app
+	url = git@e.coding.net:g-ztdo6466/kveditor/gallery-editor.git
