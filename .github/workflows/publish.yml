@@ -9,21 +9,38 @@ jobs:
   build-matrix:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ windows-2022 ]
-        # os: [ubuntu-22.04, windows-2022, macos-14]
+        os: [ubuntu-22.04, windows-2022, macos-14]
         include:
-          # - os: ubuntu-22.04
-          #   artifact_name: linux-build
-          #   enabled: false
+          - os: ubuntu-22.04
+            artifact_name: linux-build
           - os: windows-2022
             artifact_name: windows-build
-            # enabled: true
-          # - os: macos-14
-          #   artifact_name: macos-build
-          #   enabled: false
+          - os: macos-14
+            artifact_name: macos-build
 
-    steps:    
+    steps:
+    - name: Checkout main repository (含子模块)
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+        submodules: true
+        token: ${{ secrets.GH_PAT }}
+
+    - name: 缓存 Rust 编译产物
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: app/src-tauri
+
+    - name: 安装 Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '20'
+
+    - name: 安装 pnpm
+      run: npm install -g pnpm@9
+
     - name: 安装 Tauri 依赖
       if: matrix.os == 'ubuntu-22.04' || runner.os == 'Linux'
       run: |
@@ -33,42 +50,19 @@ jobs:
           libgtk-3-dev \
           libjavascriptcoregtk-4.1-dev \
           libsoup-3.0-dev \
-          libappindicator3-dev \
+          libayatana-appindicator3-dev \
           patchelf
-    - name: Checkout main repository
-      uses: actions/checkout@v4
+
+    - name: 设置 Python 3.11 (macOS 14 默认 Python 3.14 已移除 distutils)
+      if: matrix.os == 'macos-14'
+      uses: actions/setup-python@v5
       with:
-        fetch-depth: 0
+        python-version: '3.11'
 
-    - name: 安装 SSH 密钥
-      uses: webfactory/ssh-agent@v0.8.0
-      with:
-        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-
-    - name: 配置 Git 禁用主机密钥验证
-      run: |
-        # 配置 Git 全局禁用 SSH 主机密钥验证
-        git config --global core.sshCommand "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-        echo "Git SSH 配置已更新"
-        # 强制子模块使用 SSH 协议
-        # git config --global url."git@e.coding.net:".insteadOf "https://e.coding.net/"
-        
-        # 初始化并更新子模块
-        git submodule update --init --recursive --jobs 4
-
-    - name: 安装 Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18.18.0'
-
-    - name: 安装 pnpm
-      run: npm install -g pnpm@8
-    
     - name: 安装依赖
       run: pnpm install
       working-directory: app
-      
+
     - name: 构建应用
       run: pnpm build
       working-directory: app
@@ -89,16 +83,17 @@ jobs:
       contents: write
     
     steps:
-      - name: 下载构建产物
+      - name: 下载所有构建产物
         uses: actions/download-artifact@v4
         with:
-          name: windows-build
+          pattern: "*-build"
           path: dist-artifacts
+          merge-multiple: true
 
       - name: 检查下载的文件
         run: |
           echo "准备发布的文件:"
-          find dist-artifacts -name "*.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage"
+          find dist-artifacts -type f
 
       - name: 确定 Release 标签
         id: get_tag
@@ -116,7 +111,13 @@ jobs:
       - name: 创建 Release
         uses: softprops/action-gh-release@v1
         with:
-          files: dist-artifacts/**/*
+          files: |
+            dist-artifacts/**/*.AppImage
+            dist-artifacts/**/*.deb
+            dist-artifacts/**/*.dmg
+            dist-artifacts/**/*.msi
+            dist-artifacts/**/*.exe
+            dist-artifacts/**/*.rpm
           tag_name: ${{ steps.get_tag.outputs.tag }}
           name: ${{ steps.get_tag.outputs.name }}
           draft: false
